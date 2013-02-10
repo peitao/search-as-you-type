@@ -1,0 +1,11 @@
+1 biopsy int 
+2 biopsy
+3 biopsies
+4 biopsy luis int
+5 biopsy
+6 
+7 
+8 lin
+9 li liu lu ind 
+10 biopsy
+

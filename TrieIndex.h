@@ -1,0 +1,162 @@
+#ifndef __TRIEINDEX_H__
+#define __TRIEINDEX_H__
+#include <vector>
+#include <string>
+#include <fstream>
+#include <cstdlib>
+#include <list>
+#include <map>
+
+using std::string;
+using std::vector;
+using std::list;
+using std::ifstream;
+using std::ofstream;
+using std::map;
+#include "TrieBase.h"
+#include "TrieNaiveImp.h"
+
+class TrieIndex
+{
+private:
+//index data
+	typedef TrieBase<char,string,size_t> Trie;
+	Trie * mTrie;
+//search state
+	typedef typename Trie::TrieNodeHandler TrieNodeHandler;
+	string mPrefix;
+	typedef map< TrieNodeHandler , size_t > ActiveNodesSet;
+	list < ActiveNodesSet > mActiveNodesSetVec;
+	size_t mEd;
+//copy function
+	TrieIndex(const TrieIndex &);
+	TrieIndex & operator = (const TrieIndex &);
+protected:
+	void updateOrInsert(TrieNodeHandler node , size_t candidateEd, ActiveNodesSet & activeNodeSet)
+	{
+		ActiveNodesSet::iterator i = activeNodeSet.find(node);
+		if ( i == activeNodeSet.end() )
+		activeNodeSet[node] = candidateEd;
+		else
+			i->second = i->second <= candidateEd ? i->second : candidateEd;
+			
+	}
+public:	
+	void addOneChar(char newChar)
+	{
+		DEBUG_OUT("*****************************************************")
+		DEBUG_OUT(string("addOneChar ")+newChar)
+		mPrefix += newChar ;
+		DEBUG_OUT( string()+"The new prefix is \""+ mPrefix +"\"")
+		
+		ActiveNodesSet & oldActiveNodeSet = mActiveNodesSetVec.back();
+		mActiveNodesSetVec.push_back(ActiveNodesSet());
+		ActiveNodesSet & newActiveNodeSet = mActiveNodesSetVec.back();
+		
+		ActiveNodesSet::iterator i = oldActiveNodeSet.begin();
+		for( ; i != oldActiveNodeSet.end(); i++ )
+		{
+			if ( i->second + 1 <= mEd) updateOrInsert(i->first,i->second+1,newActiveNodeSet);
+			vector < TrieNodeHandler > child = mTrie->getChildNodeHandlers(i->first);
+			for (size_t childId = 0; childId < child.size() ;childId++ )
+			{
+				TrieNodeHandler cChild = child[childId];
+				char cChar = mTrie->getNodeKey(cChild);
+				if(cChar!=newChar)
+				{
+					if( i->second + 1 <= mEd )
+						updateOrInsert(cChild, i->second + 1 ,newActiveNodeSet);
+				}
+				else //cChar == newChar
+				{
+					//updateOrInsert(cChild, i->second ,newActiveNodeSet);
+					list< pair < TrieNodeHandler,size_t> >  candidateNode;
+					size_t deep = mEd - i->second ;
+					mTrie->getNDeepChildSet(cChild,0,deep,candidateNode);
+					list< pair < TrieNodeHandler,size_t> >::iterator cc = candidateNode.begin();
+					for(;cc!=candidateNode.end();cc++)
+					{
+						updateOrInsert(cc->first, cc->second + i->second ,newActiveNodeSet);
+					}
+				}
+			}
+		}
+		//DEBUG
+		DEBUG_OUT(string("addOneChar ")+newChar + "...done")
+		
+		ActiveNodesSet & debugSet = mActiveNodesSetVec.back();
+		ActiveNodesSet::iterator debugSetIt = debugSet.begin();
+		for (;debugSetIt!=debugSet.end();debugSetIt++)
+		{
+			DEBUG_OUT(debugSetIt->first)
+			DEBUG_OUT(debugSetIt->second)
+		}
+		
+		
+		DEBUG_OUT("\n\n")
+	}
+	void initTheSearchStat( size_t ed )
+	{
+		DEBUG_OUT("initTheSearchStat")
+		mEd = ed;
+		mPrefix.clear();
+		mActiveNodesSetVec.clear();
+		
+		
+		mActiveNodesSetVec.push_back(ActiveNodesSet());
+
+		list< pair < TrieNodeHandler,size_t> >  candidateNode;
+		mTrie->getNDeepChildSet(mTrie->getRootNodeHandler(),0,mEd,candidateNode);
+		list< pair < TrieNodeHandler,size_t> >::iterator i = candidateNode.begin();
+		
+		for(;i!=candidateNode.end();i++)
+		{
+			mActiveNodesSetVec.back().insert( *i );
+		}
+	}
+	////////////
+	TrieIndex()
+	{
+		mTrie = new TrieNaiveImp<char,string,size_t>();
+	}
+	~TrieIndex()
+	{
+		delete mTrie; 
+	}
+	void buildIndexFromFile(const char * filename)
+	{
+		ifstream fin (filename);
+		CHECK_FALSE(fin,string()+"Fail to open file \" "+filename+" \" in \"buildIndexFromFile\" ")
+		buildIndexFromStream( fin );
+	}
+	void buildIndexFromStream( istream & in )
+	{
+		DEBUG_OUT("Build index...")
+		while(1)
+		{
+			size_t recordId;
+			vector<string> recordWords;
+			if ( parserOneLineFromStream( in, recordId, recordWords ) == false ) break;
+			//DEBUG_OUT("read a line...")
+			//DEBUG_OUT(recordId)
+			for(size_t i = 0; i < recordWords.size(); i++)
+			{
+				//DEBUG_OUT(recordWords[i])
+				mTrie->insert( recordWords[i], recordId );
+			}
+		}
+		mTrie->computeAndStoreIds();
+		// use the mTrie to build a forward index storing words by ids, the interface ?.
+		DEBUG_OUT("Build index...done")
+		DEBUG_OUT("Draw the trie....")
+		ofstream out ("data/trie.dot");
+		mTrie->outputToStreamByPlot(out);
+		out.close();
+		int r = system ("dot -Tpng data/trie.dot -o data/trie.png");
+		DEBUG_OUT("Draw the trie....done")
+	}
+};
+
+
+#endif /* __TRIEINDEX_H__ */
+

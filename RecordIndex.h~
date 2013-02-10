@@ -1,0 +1,17 @@
+#ifndef __RECORDINDEX_H__
+#define __RECORDINDEX_H__
+
+#include <string>
+
+class RecordIndex  : public ListIndex <size_t,std::string>
+{
+public:
+	RecordIndex(const char * filename)
+	{
+		initFromFile(filename);
+	}	
+};
+
+
+#endif /* __RECORDINDEX_H__ */
+

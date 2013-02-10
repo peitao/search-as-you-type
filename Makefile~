@@ -1,0 +1,14 @@
+objects = main.o ForwardIndex.o ListIndex.o RecordIndex.o
+
+CXXFLAGS = -O2
+
+app:$(objects)
+	g++ -O2 -o app $(objects)
+
+main.o:main.cpp *.h
+ForwardIndex.o:ForwardIndex.cpp *.h
+ListIndex.o:ListIndex.cpp *.h
+RecordIndex.o:RecordIndex.cpp *.h
+
+clean:
+	rm -f *.o app
